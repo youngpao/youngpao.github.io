@@ -1,45 +1,49 @@
-# jekyll-uno
+# Autm-rb
 
-Jekyll-Uno - a minimal, responsive theme for Jekyll based on the [Uno](https://github.com/daleanthony/Uno) theme for Ghost.
+Another theme for jekyll.
+based on shiori and midnight
 
-> :warning:
-  This theme requires ruby and rubygems installed
+##[DEMO][demo]
 
-### Features
+- DISQUS comments
+- google analitics
+- pagination
+- tags
+- codehighlighting
+- bootstrap components
+- font awesome
 
-* Clean layout
-* Resposive layout
-* Pagination
-* Syntax highlighting
-* Social links
-* Tags listing page
-* Categories listing page
-* Google Analytics integration
-* Disqus integration
+#### Contribution
+Pull Requests always welcome.
 
----
+## Screens
 
-### Install and Test
+![](http://i.imgur.com/i1OZoFF.png)
+![](http://i.imgur.com/oc2ZfjH.png)
 
-1. Download or clone repo `git clone git@github.com:joshgerdes/jekyll-uno.git`
-2. Enter the folder: `cd jekyll-uno/`
-3. If you don't have bundler installed: `gem install bundler`
-3. Install Ruby gems: `bundle install`
-4. Start Jekyll server: `jekyll serve`
+## Installation
 
-Access via: [http://localhost:4000/jekyll-uno](http://localhost:4000/jekyll-uno)
+- [Fork this repository][fork]
+- Clone it: `git clone https://github.com/YOUR-USER/autm-rb`
+- Install the [GitHub Pages gem][pages] (includes Jekyll): `bundle install`
+- Run the jekyll server: `jekyll serve` or `bundle exec jekyll serve`
 
----
+## Customization
 
-### Demo and Download
+Edit this files before using 
+ 
+- _config.yml REQUIRED
+- /index.html - change the default image and email
+- /projects.html - here you can share some of your projects
+- /resume.html - write something about you
+- /favicon.ico change it or leave the existing one
+- _includes/title.html REQUIRED
 
-[Demo](http://joshgerdes.com/jekyll-uno/)
-[Download](https://github.com/joshgerdes/jekyll-uno/archive/master.zip)
+## Licensing
 
-![jekyll-uno - free Jekyll theme](/screenshot.png)
+[MIT](https://github.com/railsr/autm-rb/blob/master/LICENSE)
 
----
 
-### Copyright and license
-
-It is under [the MIT license](/LICENSE).
+[pages]: http://pages.github.com
+[fork]: https://github.com/railsr/autm-rb/fork
+[demo]: http://railsr.github.io/autm-rb/
