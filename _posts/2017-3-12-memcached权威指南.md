@@ -104,3 +104,69 @@ memcached 客户端与服务器端的通信比较简单,使用的基于文本的
 
 ![](http://i.imgur.com/a9CEFa8.png)
 
+
+## memcached 的命令 add ##
+
+增: add 往内存增加一行新记录
+
+语法: add key flag expire length 回车
+
+key 给值起一个独特的名字
+
+flag 标志,要求为一个正整数
+
+expire 有效期
+
+length 缓存的长度(字节为单位)
+
+flag 的意义:
+
+memcached 基本文本协议,传输的东西,理解成字符串来存储. 想:让你存一个 php 对象,和一个 php 数组,怎么办?
+
+答:序列化成字符串,往出取的时候,自然还要反序列化成 对象/数组/json 格式等等. 这时候, flag 的意义就体现出来了. 比如, 1 就是字符串, 2 反转成数组 3,反序列化对象..... expire 的意义:
+
+设置缓存的有效期,有 3 种格式
+
+1:设置秒数, 从设定开始数,第 n 秒后失效.
+
+ 2:时间戳, 到指定的时间戳后失效. 比如在团购网站,缓存的某团到中午 12:00 失效. add key 0 1379209999 6
+
+3: 设为 0. 不自动失效.
+
+注意：
+
+1:编译 memcached 时,指定一个最长常量,默认是 30 天. 
+
+所以,即使设为 0,30 天后也会失效. 
+
+2:可能等不到 30 天,就会被新数据挤出去.
+
+**删改查**
+
+delete 删除
+
+delete key [time seconds]
+
+删除指定的 key. 如加可选参数 time,则指删除 key,并在删除 key 后的 time 秒内,不允许
+get,add,replace 操作此 key.
+
+replace 替换
+
+replace key flag expire length
+
+参数和 add 完全一样,不单独写
+
+get 查询
+
+get key
+
+返回 key 的值
+
+set 是设置和修改值
+
+set 想当于有 add replace 两者的功能. set key flag expire leng 时
+
+如果服务器无此键 ----> 增加的效果
+
+如果服务器有此键 ----> 修改的效果.
+
