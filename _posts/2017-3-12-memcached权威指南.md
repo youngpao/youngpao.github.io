@@ -179,3 +179,120 @@ incr ,decr 命令:增加/减少值的大小
 应用场景------秒杀功能, 一个人下单,要牵涉数据库读取,写入订单,更改库存,及事务要求, 对于传统型数据库来说, 压力是巨大的. 可以利用 memcached 的 incr/decr 功能, 在内存存储 count 库存量, 秒杀 1000 台
 每人抢单主要在内存操作,速度非常快, 抢到 count<=1000 的号人,得一个订单号,再去另一个页面慢慢支付
 
+**统计命令: stats**
+
+把 memcached 当前的运行信息统计出来
+
+stats
+
+stat pid 2296 进程号
+
+stat uptime 4237 持续运行时间
+
+stat time 1370054990
+
+stat version 1.2.6
+
+stat pointer_size 32
+
+stat curr_items 4 当前存储的键个数
+
+stat total_items 13
+
+stat bytes 236
+
+stat curr_connections 3
+
+stat total_connections 4
+
+stat connection_structures 4
+
+stat cmd_get 20
+
+stat cmd_set 16
+
+stat get_hits 13
+
+stat get_misses 7 // 这 2 个参数 可以算出命中率
+
+stat evictions 0
+
+stat bytes_read 764
+
+stat bytes_written 618
+
+stat limit_maxbytes 67108864
+
+stat threads 1
+
+end
+
+缓存有一个重要的概念: 命中率. 
+
+命中率是指: (查询到数据的次数/查询总数)*100%
+
+如上, 13/(13+7) = 60+% , 的命中率.
+
+**flush_all **清空所有的存储对象
+
+## 编译 PHP 及 memcached 扩展 ##
+
+**编译 apache+php**
+
+apache 编译:
+
+	#1 解压
+	# tar zxvf http-2.2.45.tar.gz
+	# cd http-2.2.45
+	# ./configure --prefix=/usr/local/httpd (你也可以指定自己的路径)
+	#make && make install
+
+php 编译并与 apache 整合:
+
+	#1 编译 php
+	# yum install libxml2 libxml2-devel
+	# tar zxvf php-xxx.tar.gz
+	# cd php-xxx
+	#./configure--prefix=/usr/local/php \
+	--with-apxs2=/usr/local/httpd/bin/apxs
+	# make && make install
+	# 2. 与 apache 整合
+	# vim 编辑 http.conf,添加如下
+	# addtype application/x-httpd-php .php
+	# 3: 重启 apache
+
+注:
+
+如果在 configure 过程中,提示缺少 libxml2 的库,则如下操作:
+
+	#yum install libxml2 libxml2-devel
+
+**编译 php-memcache 扩展**
+
+1: 到软件的官方(如 memcached)或 pecl.php.net 去寻找扩展源码并下载解压
+
+2: 进入到 path/memcache 目录
+
+3: 根据当前的 php 版本动态的创建扩展的 configure 文件
+
+	#/xxx/path/php/bin/phpize \
+	--with-php-config=/xxx/path/php/bin/php-config
+	4: ./configure -with-php-config=/xxx/path/php/bin/php-config
+	5: make && make install
+	6:把生成的.so 扩展, 在 php.ini 里引入.
+	7:重启 apache
+
+## windows 下安装 php-memcached 扩展 ##
+
+1) 通过 phpinfo()观察如下 3 个参数,即 php 版本, ts/nts, vc6/vc9
+
+2) 根据上步中的参数,到 http://downloads.php.net/pierre/ 下载匹配的 memcache.dll
+
+3) 再次观察 phpinfo()信息,找出 extension_dir, 并把下载的 memcache.dll 放入该路径
+
+4) 并修改 php.ini, 加入 extension=php_memcache.dll,引入该 dll
+
+5) 重启 apache
+
+## memcached 实战 ##
+
