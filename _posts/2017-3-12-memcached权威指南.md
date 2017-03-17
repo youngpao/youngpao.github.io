@@ -296,3 +296,4 @@ php 编译并与 apache 整合:
 
 ## memcached 实战 ##
 
+memcached
