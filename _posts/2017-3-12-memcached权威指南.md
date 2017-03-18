@@ -296,3 +296,61 @@ php 编译并与 apache 整合:
 
 ## memcached 实战 ##
 
+	<?php
+	$sql = 'select goods_id,goods_name from ecs_goods where is_hot=1 limit
+	5';
+	// 判断 memcached 中是否缓存热门商品,如果没有,则查询数据库
+	$hot = array();
+	if( !($hot=$memcache->get($sql)) ) {
+	$hot = $mysql->getAll($sql);
+	echo '<font color="red">查询自数据库</font>';
+	//从数据库取得数据后,把数据写入 memcached
+	$memcache->add($sql,$hot,0,300); // 并设置有效期 300 秒
+	} else {
+	echo '<font color="red">查询自 memcached</font>';
+	}
+	?>
+
+中继 MySQL 主从延迟数据
+
+MySQL 在做 replication 时,主从复制之间必然要经历一个复制过程,即主从延迟的时间. 尤其是主从服务器处于异地机房时,这种情况更加明显. 把 facebook 官方的一篇技术文章,其加州的主数据中心到弗吉尼亚州的主从同步延期达到70ms;
+
+考虑如下场景:
+
+①: 用户 U 购买电子书 B, insert into Master (U,B);
+
+②: 用户 U 观看电子书 B, select 购买记录[user=’A’,book=’B’] from Slave.
+
+③: 由于主从延迟,第②步中无记录,用户无权观看该书. 这时,可以利用 memached 在 master 与 slave 之间做过渡(图 5.2):
+
+①: 用户 U 购买电子书 B, memcached->add(‘U:B’,true)
+
+②: 主数据库 insert into Master (U,B);
+
+③: 用户 U 观看电子书 B, select 购买记录[user=’U’,book=’B’] from Slave.
+
+如果没查询到,则 memcached->get(‘U:B’),查到则说明已购买但 Slave 延迟. ④: 由于主从延迟,第②步中无记录,用户无权观看该书.
+
+![](http://i.imgur.com/iMYQ2d9.png)
+
+## 永久数据被踢现象 ##
+
+其实,这要从 2 个方面来找原因:
+
+即前面介绍的 惰性删除,与 LRU 最近最少使用记录删除. 分析:
+
+1:如果 slab 里的很多 chunk,已经过期,但过期后没有被 get 过, 系统不知他们已经过期.
+
+2:永久数据很久没 get 了,不活跃,如果新增 item,则永久数据被踢了. 
+
+3: 当然,如果那些非永久数据被 get,也会被标识为 expire,从而不会再踢掉永久数据
+
+![](http://i.imgur.com/iF3nQXe.png)
+
+解决方案: 永久数据和非永久数据分开放
+
+## 缓存雪崩现象 ##
+
+缓存雪崩一般是由某个缓存节点失效,导致其他节点的缓存命中率下降, 缓存中缺失的数据
+去数据库查询.短时间内,造成数据库服务器崩溃. 重启 DB,短期又被压跨,但缓存数据也多一些. DB 反复多次启动多次,缓存重建完毕,DB 才稳定运行. 或者,是由于缓存周期性的失效,比如每 6 小时失效一次,那么每 6 小时,将有一个请求”峰值”, 严重者甚至会令 DB 崩溃.
+
