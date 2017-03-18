@@ -296,6 +296,7 @@ php 编译并与 apache 整合:
 
 ## memcached 实战 ##
 
+<<<<<<< HEAD
 	<?php
 	$sql = 'select goods_id,goods_name from ecs_goods where is_hot=1 limit
 	5';
@@ -354,3 +355,6 @@ MySQL 在做 replication 时,主从复制之间必然要经历一个复制过程
 缓存雪崩一般是由某个缓存节点失效,导致其他节点的缓存命中率下降, 缓存中缺失的数据
 去数据库查询.短时间内,造成数据库服务器崩溃. 重启 DB,短期又被压跨,但缓存数据也多一些. DB 反复多次启动多次,缓存重建完毕,DB 才稳定运行. 或者,是由于缓存周期性的失效,比如每 6 小时失效一次,那么每 6 小时,将有一个请求”峰值”, 严重者甚至会令 DB 崩溃.
 
+=======
+memcached
+>>>>>>> origin/master
