@@ -355,6 +355,173 @@ MySQL 在做 replication 时,主从复制之间必然要经历一个复制过程
 缓存雪崩一般是由某个缓存节点失效,导致其他节点的缓存命中率下降, 缓存中缺失的数据
 去数据库查询.短时间内,造成数据库服务器崩溃. 重启 DB,短期又被压跨,但缓存数据也多一些. DB 反复多次启动多次,缓存重建完毕,DB 才稳定运行. 或者,是由于缓存周期性的失效,比如每 6 小时失效一次,那么每 6 小时,将有一个请求”峰值”, 严重者甚至会令 DB 崩溃.
 
-=======
-memcached
->>>>>>> origin/master
+## memcached 的内存管理与删除机制 ##
+
+内存的碎片化
+
+如果用 c 语言直接 malloc,free 来向操作系统申请和释放内存时, 在不断的申请和释放过程中,形成了一些很小的内存片断,无法再利用. 这种空闲,但无法利用内存的现象,---称为内存的碎片化
+
+
+slab allocator 缓解内存碎片化
+
+memcached 用 slab allocator 机制来管理内存. slab allocator 原理: 预告把内存划分成数个 slab class 仓库.(每个 slab class 大小 1M)
+
+各仓库,切分成不同尺寸的小块(chunk). 
+
+需要存内容时,判断内容的大小,为其选取合理的仓库.
+
+![](http://i.imgur.com/inyoRcK.png)
+
+系统如何选择合适的 chunk?
+
+memcached 根据收到的数据的大小, 选择最适合数据大小的 chunk 组(slab class)
+
+memcached 中保存着 slab class 内空闲 chunk 的列表, 根据该列表选择空的 chunk, 然后将数据缓存于其中。
+
+![](http://i.imgur.com/rDUWSra.png)
+
+固定大小 chunk 带来的内存浪费
+
+由于 slab allocator 机制中, 分配的 chunk 的大小是”固定”的, 因此, 对于特定的 item,可能造成内存空间的浪费. 比如, 将 100 字节的数据缓存到 122 字节的 chunk 中, 剩余的 22 字节就浪费了
+
+![](http://i.imgur.com/evxp0b9.png)
+
+对于 chunk 空间的浪费问题,无法彻底解决,只能缓解该问题. 开发者可以对网站中缓存中的 item 的长度进行统计,并制定合理的 slab class 中的 chunk 的大小. 可惜的是,我们目前还不能自定义 chunk 的大小,但可以通过参数来调整各 slab class 中 chunk大小的增长速度. 即增长因子, grow factor!
+
+grow factor 调优
+
+memcached 在启动时可以通过­f 选项指定 Growth Factor 因子, 并在某种程度上控制 slab 之
+间的差异. 默认值为 1.25. 但是,在该选项出现之前,这个因子曾经固定为 2,称为”powers of 2” 策略。
+
+我们分别用 grow factor 为 2 和 1.25 来看一看效果:
+
+	>memcached ­f 2 ­vvv
+	slab class 1: chunk size 128 perslab 8192
+	slab class 2: chunk size 256 perslab 4096
+	slab class 3: chunk size 512 perslab 2048
+	slab class 4: chunk size 1024 perslab 1024
+	....
+	.....
+	slab class 10: chunk size 65536 perslab 16
+	slab class 11: chunk size 131072 perslab 8
+	slab class 12: chunk size 262144 perslab 4
+	slab class 13: chunk size 524288 perslab 2
+
+可见，从 128 字节的组开始，组的大小依次增大为原来的 2 倍. 来看看 f=1.25 时的输出:
+
+	>memcached -f 1.25 -vvv
+	slab class 1: chunk size 88 perslab 11915
+	slab class 2: chunk size 112 perslab 9362
+	slab class 3: chunk size 144 perslab 7281
+	slab class 4: chunk size 184 perslab 5698
+	....
+	....
+	slab class 36: chunk size 250376 perslab 4
+	slab class 37: chunk size 312976 perslab 3
+	slab class 38: chunk size 391224 perslab 2
+	slab class 39: chunk size 489032 perslab 2
+
+对比可知, 当 f=2 时, 各 slab 中的 chunk size 增长很快,有些情况下就相当浪费内存. 因此,我们应细心统计缓存的大小,制定合理的增长因子.
+
+注意:
+
+当 f=1.25 时,从输出结果来看,某些相邻的 slab class 的大小比值并非为 1.25,可能会觉得有些计算误差，这些误差是为了保持字节数的对齐而故意设置的.
+
+## 分布式集群算法 ##
+
+memcached 如何实现分布式?
+
+在第 1 章中,我们介绍 memcached 是一个”分布式缓存”,然后 memcached 并不像 mongoDB 那
+样,允许配置多个节点,且节点之间”自动分配数据”. 就是说--memcached 节点之间,是不互相通信的. 因此,memcached 的分布式,要靠用户去设计算法,把数据分布在多个 memcached 节点中.
+
+
+一致性哈希算法原理
+
+通俗理解一致性哈希:
+把各服务器节点映射放在钟表的各个时刻上, 把 key 也映射到钟表的某个时刻上. 该 key 沿钟表顺时针走,碰到的第 1 个节点即为该 key 的存储节点
+
+![](http://i.imgur.com/cqwud7F.png)
+
+一致性哈希对其他节点的影响
+
+当某个节点 down 后,只影响该节点顺时针之后的 1 个节点,而其他节点
+不受影响.因此，Consistent Hashing 最大限度地抑制了键的重新分布
+
+![](http://i.imgur.com/ioLYLnM.png)
+
+一致性哈希+虚拟节点对缓存命中率的影响
+
+1) 节点在圆环上分配分配均匀,因此承担的任务也平均,但事实上, 一般的 Hash 函数对于节
+点在圆环上的映射,并不均匀. 
+
+2) 当某个节点 down 后,直接冲击下 1 个节点,对下 1 个节点冲击过大,能否把 down 节点上的
+压力平均的分担到所有节点上?
+
+![](http://i.imgur.com/ySCvkOg.png)
+
+一致性哈希的 PHP 实现
+
+	/*
+	实现一致性哈希分布的核心功能.
+	*/
+	// 需要一个把字符串转成整数的接口
+	interface hasher {
+	public function _hash($str);
+	}
+	interface distribution {
+	public function lookup($key);
+	}
+	class Consistent implements hasher,distribution {
+	protected $_nodes = array();
+	protected $_postion = array();
+	protected $_mul = 64; //每个节点对应 64 个虚节点
+	public function _hash($str) {
+	return sprintf('%u',crc32($str)); // 把字符串转成 32 位符号整数
+	}
+	// 核心功能
+	public function lookup($key) {
+	$point = $this->_hash($key);
+	$node = current($this->_postion); //先取圆环上最小的一个节点,当
+	成结果
+	foreach($this->_postion as $k=>$v) {
+	if($point <= $k) {
+	$node = $v;
+	break;
+	}
+	}
+	reset($this->_postion);
+	return $node;
+	}
+	public function addNode($node) {
+	if(isset($this->nodes[$node])) {
+	return;
+	}
+	for($i=0; $i<$this->_mul; $i++) {
+	$pos = $this->_hash($node . '-' . $i);
+	$this->_postion[$pos] = $node;
+	$this->_nodes[$node][] = $pos;
+	}
+	$this->_sortPos();
+	}
+	// 循环所有的虚节点,谁的值==指定的真实节点 ,就把他删掉
+	public function delNode($node) {
+	if(!isset($this->_nodes[$node])) {
+	return;
+	}
+	foreach($this->_nodes[$node] as $k) {
+	unset($this->_postion[$k]);
+	}
+	unset($this->_nodes[$node]);
+	}
+	protected function _sortPos() {
+	ksort($this->_postion,SORT_REGULAR);
+	}
+	}
+	// 测试
+	$con = new Consistent();
+	$con->addNode('a');
+	$con->addNode('b');
+	$con->addNode('c');
+	$key = 'www.zixue.it';
+	echo '此 key 落在',$con->lookup($key),'号节点';
+
