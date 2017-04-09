@@ -3,9 +3,9 @@
 # Basic
 name:               "youngpao's blog"
 
-author:
-  github:           youngpao
-  email:            772039155@qq.com
+# author:
+#   github:           youngpao
+#   email:            772039155@qq.com
 
 copyright:
   year:             2017
